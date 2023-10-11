@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+option go_package = "/grpc";
+
+package grpc;
+
+service proto {
+    rpc SendMessage(stream Message) returns (stream Message);
+}
+
+message Message {
+    string  clientName   = 1;
+    string  msg          = 2;
+    int64   time         = 3;
+}
