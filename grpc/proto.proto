@@ -11,5 +11,5 @@ message Message {
 }
 
 service proto {
-    rpc SendMessage(stream Message) returns (stream Message);
+    rpc AskForMessages(stream Message) returns (stream Message);
 }

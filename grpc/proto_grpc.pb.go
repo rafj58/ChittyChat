@@ -22,7 +22,7 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ProtoClient interface {
-	SendMessage(ctx context.Context, opts ...grpc.CallOption) (Proto_SendMessageClient, error)
+	AskForMessages(ctx context.Context, opts ...grpc.CallOption) (Proto_AskForMessagesClient, error)
 }
 
 type protoClient struct {
@@ -33,30 +33,30 @@ func NewProtoClient(cc grpc.ClientConnInterface) ProtoClient {
 	return &protoClient{cc}
 }
 
-func (c *protoClient) SendMessage(ctx context.Context, opts ...grpc.CallOption) (Proto_SendMessageClient, error) {
-	stream, err := c.cc.NewStream(ctx, &Proto_ServiceDesc.Streams[0], "/proto.proto/SendMessage", opts...)
+func (c *protoClient) AskForMessages(ctx context.Context, opts ...grpc.CallOption) (Proto_AskForMessagesClient, error) {
+	stream, err := c.cc.NewStream(ctx, &Proto_ServiceDesc.Streams[0], "/proto.proto/AskForMessages", opts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &protoSendMessageClient{stream}
+	x := &protoAskForMessagesClient{stream}
 	return x, nil
 }
 
-type Proto_SendMessageClient interface {
+type Proto_AskForMessagesClient interface {
 	Send(*Message) error
 	Recv() (*Message, error)
 	grpc.ClientStream
 }
 
-type protoSendMessageClient struct {
+type protoAskForMessagesClient struct {
 	grpc.ClientStream
 }
 
-func (x *protoSendMessageClient) Send(m *Message) error {
+func (x *protoAskForMessagesClient) Send(m *Message) error {
 	return x.ClientStream.SendMsg(m)
 }
 
-func (x *protoSendMessageClient) Recv() (*Message, error) {
+func (x *protoAskForMessagesClient) Recv() (*Message, error) {
 	m := new(Message)
 	if err := x.ClientStream.RecvMsg(m); err != nil {
 		return nil, err
@@ -68,7 +68,7 @@ func (x *protoSendMessageClient) Recv() (*Message, error) {
 // All implementations must embed UnimplementedProtoServer
 // for forward compatibility
 type ProtoServer interface {
-	SendMessage(Proto_SendMessageServer) error
+	AskForMessages(Proto_AskForMessagesServer) error
 	mustEmbedUnimplementedProtoServer()
 }
 
@@ -76,8 +76,8 @@ type ProtoServer interface {
 type UnimplementedProtoServer struct {
 }
 
-func (UnimplementedProtoServer) SendMessage(Proto_SendMessageServer) error {
-	return status.Errorf(codes.Unimplemented, "method SendMessage not implemented")
+func (UnimplementedProtoServer) AskForMessages(Proto_AskForMessagesServer) error {
+	return status.Errorf(codes.Unimplemented, "method AskForMessages not implemented")
 }
 func (UnimplementedProtoServer) mustEmbedUnimplementedProtoServer() {}
 
@@ -92,25 +92,25 @@ func RegisterProtoServer(s grpc.ServiceRegistrar, srv ProtoServer) {
 	s.RegisterService(&Proto_ServiceDesc, srv)
 }
 
-func _Proto_SendMessage_Handler(srv interface{}, stream grpc.ServerStream) error {
-	return srv.(ProtoServer).SendMessage(&protoSendMessageServer{stream})
+func _Proto_AskForMessages_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(ProtoServer).AskForMessages(&protoAskForMessagesServer{stream})
 }
 
-type Proto_SendMessageServer interface {
+type Proto_AskForMessagesServer interface {
 	Send(*Message) error
 	Recv() (*Message, error)
 	grpc.ServerStream
 }
 
-type protoSendMessageServer struct {
+type protoAskForMessagesServer struct {
 	grpc.ServerStream
 }
 
-func (x *protoSendMessageServer) Send(m *Message) error {
+func (x *protoAskForMessagesServer) Send(m *Message) error {
 	return x.ServerStream.SendMsg(m)
 }
 
-func (x *protoSendMessageServer) Recv() (*Message, error) {
+func (x *protoAskForMessagesServer) Recv() (*Message, error) {
 	m := new(Message)
 	if err := x.ServerStream.RecvMsg(m); err != nil {
 		return nil, err
@@ -127,8 +127,8 @@ var Proto_ServiceDesc = grpc.ServiceDesc{
 	Methods:     []grpc.MethodDesc{},
 	Streams: []grpc.StreamDesc{
 		{
-			StreamName:    "SendMessage",
-			Handler:       _Proto_SendMessage_Handler,
+			StreamName:    "AskForMessages",
+			Handler:       _Proto_AskForMessages_Handler,
 			ServerStreams: true,
 			ClientStreams: true,
 		},
