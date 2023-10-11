@@ -1,15 +1,15 @@
 syntax = "proto3";
 
-option go_package = "/grpc";
+option go_package = "grpc/proto";
 
-package grpc;
-
-service proto {
-    rpc SendMessage(stream Message) returns (stream Message);
-}
+package proto;
 
 message Message {
     string  clientName   = 1;
     string  msg          = 2;
     int64   time         = 3;
+}
+
+service proto {
+    rpc SendMessage(stream Message) returns (stream Message);
 }
