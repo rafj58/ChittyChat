@@ -4,12 +4,17 @@ option go_package = "grpc/proto";
 
 package proto;
 
-message Message {
-    string  clientName   = 1;
-    string  msg          = 2;
-    int64   time         = 3;
+message ClientReference {
+    string client_address = 1;
+    int32 client_port = 2;
 }
 
-service proto {
-    rpc AskForMessages(stream Message) returns (stream Message);
+message Message {
+    string text = 1;
+    int32 type = 2;
+    ClientReference client_reference = 3;
+}
+
+service ChittyChatService {
+    rpc SendMessage (stream Message) returns (stream Message);
 }
