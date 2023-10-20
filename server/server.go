@@ -1,15 +1,15 @@
 package main
 
 import (
+	proto "ChittyChat/grpc"
 	"flag"
 	"fmt"
 	"log"
+	"math"
 	"net"
 	"os"
 	"strconv"
 	"sync"
-
-	proto "ChittyChat/grpc"
 
 	"google.golang.org/grpc"
 )
@@ -18,6 +18,7 @@ const ( // connection status
 	Connect    int = 0
 	Disconnect     = 1
 	Publish        = 2
+	Ack            = 3
 )
 
 type Server struct {
@@ -30,6 +31,8 @@ type Server struct {
 
 // flags are used to get arguments from the terminal. Flags take a value, a default value and a description of the flag.
 var port = flag.Int("port", 1000, "server port") // set with "-port <port>" in terminal
+
+var time = 0 // Lamport variable
 
 func main() {
 
@@ -79,11 +82,14 @@ func (s *Server) SendMessage(stream proto.ChittyChatService_SendMessageServer) e
 		s.clientReferences = make(map[string]proto.ChittyChatService_SendMessageServer)
 	}
 
+	// when a client disconnect I terminate the relative gRPC instance
 	run := true
-
 	for run {
 		msg, err := stream.Recv()
-
+		// update local time
+		if msg.Time != 0 {
+			setTime(int(msg.Time))
+		}
 		// client reference as a String
 		clientString := msg.ClientReference.ClientAddress + ":" + strconv.Itoa(int(msg.ClientReference.ClientPort))
 		log.Printf("Received message from %s", clientString)
@@ -98,31 +104,49 @@ func (s *Server) SendMessage(stream proto.ChittyChatService_SendMessageServer) e
 			{
 				// add to map
 				s.clientReferences[clientString] = stream
+				log.Printf("Client %s connected", clientString)
+				/* R6: A "Participant X  joined Chitty-Chat at Lamport time L" message is broadcast
+				to all Participants when client X joins, including the new Participant. */
+				for clientRef, clientStream := range s.clientReferences {
+					msg.Time = int32(time)
+					err = clientStream.Send(msg)
+					increaseTime() // an event occurred
+					if err != nil {
+						log.Printf("Error during forwarding connection message to %s: %v", clientRef, err)
+						break
+					}
+				}
 				break
 			}
-
 		case Disconnect:
 			{
-				// forward the disconnect
+				// reply with ack
+				stream.Send(&proto.Message{Type: Ack})
+				// remove stream from map
+				delete(s.clientReferences, clientString)
+				log.Printf("Client %s disconnected", clientString)
+				/* R8: A "Participant X left Chitty-Chat at Lamport time L" message is broadcast
+				to all remaining Participants when Participant X leaves. */
 				for clientRef, clientStream := range s.clientReferences {
+					msg.Time = int32(time)
 					err = clientStream.Send(msg)
+					increaseTime() // an event occurred
 					if err != nil {
 						log.Printf("Error during forwarding disconnection message to %s: %v", clientRef, err)
 						break
 					}
 				}
-				// remove stream from map
-				delete(s.clientReferences, clientString)
-				log.Printf("Client %s disconnected", clientString)
 				run = false
 				break
 			}
-
 		case Publish:
 			{
+				/* R3: Chitty-Chat service broadcast every published message, together with the current logical time */
 				for clientRef, clientStream := range s.clientReferences {
 					if clientRef != clientString { // Do not forward the message to the original sender
+						msg.Time = int32(time) // send current logial timestamp
 						err = clientStream.Send(msg)
+						increaseTime() // an event occurred
 						if err != nil {
 							log.Printf("Error during forwarding to %s: %v", clientRef, err)
 							break
@@ -150,4 +174,13 @@ func setLog() *os.File {
 	}
 	log.SetOutput(f)
 	return f
+}
+
+func increaseTime() {
+	time++
+}
+
+func setTime(received int) {
+	max := math.Max(float64(received), float64(time))
+	time = int(max + 1)
 }

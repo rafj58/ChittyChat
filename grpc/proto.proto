@@ -12,7 +12,9 @@ message ClientReference {
 message Message {
     string text = 1;
     int32 type = 2;
-    ClientReference client_reference = 3;
+    int32 time = 3;
+    // time will be represented by Lamport clocks incremented when a message is received or sended
+    ClientReference client_reference = 4;
 }
 
 service ChittyChatService {
