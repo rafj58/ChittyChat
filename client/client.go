@@ -32,6 +32,8 @@ const ( // connection status
 var (
 	clientPort = flag.Int("cPort", 5500, "client port")
 	serverPort = flag.Int("sPort", 1000, "server port")
+	serverAddr = flag.String("sAddr", "localhost", "server address")
+	clientName = flag.String("cName", "Anonymous", "client name")
 	time       = 0 // Lamport variable
 )
 
@@ -45,7 +47,7 @@ func main() {
 
 	// Create a client
 	client := &Client{
-		name:       "client",
+		name:       *clientName,
 		address:    "127.0.0.1", // modify in case of global test
 		portNumber: *clientPort,
 	}
@@ -62,6 +64,7 @@ func connectAndPublish(client *Client) {
 	client_reference := &proto.ClientReference{
 		ClientAddress: client.address,
 		ClientPort:    int32(client.portNumber),
+		ClientName:    client.name,
 	}
 
 	// Get a stream to the server
@@ -105,8 +108,9 @@ func connectAndPublish(client *Client) {
 				break
 			} else {
 				// R4: When a client receives a broadcasted message, it has to write the message and the current logical timestamp
-				senderReference := msg.ClientReference.ClientAddress + ":" + strconv.Itoa(int(msg.ClientReference.ClientPort))
-				log.Printf("[%s] sent %s serverTime %d  localTime %d \n", senderReference, msg.Text, msg.Time, time)
+				//senderReference := msg.ClientReference.ClientAddress + ":" + strconv.Itoa(int(msg.ClientReference.ClientPort))
+				log.Printf("[Lambert Time: %d, Name: %s] %s\n", msg.Time, msg.ClientReference.ClientName, msg.Text)
+				//log.Printf("[%s] sent %s serverTime %d  localTime %d \n", senderReference, msg.Text, msg.Time, time)
 				log.Printf("Enter the content of the message ('exit' to quit): ") // just for better user experience
 			}
 
@@ -119,29 +123,31 @@ func connectAndPublish(client *Client) {
 		fmt.Scanln(&text)
 		// R7: Chat clients can drop out at any time
 		if text == "exit" {
+			increaseTime() // an event occurred
 			// Disconnect message from client to server
 			diconnectMessage := &proto.Message{
 				Text:            "disconnect message",
 				Type:            int32(Disconnect),
 				ClientReference: client_reference,
+				Time:            int32(time),
 			}
 			if err := stream.Send(diconnectMessage); err != nil {
 				log.Fatalf("Error while sending disconnection message: %v", err)
 			}
-			increaseTime() // an event occurred
 			break
 		}
 
+		increaseTime() // an event occurred
 		// R2: Clients in Chitty-Chat can Publish a valid chat message at any time they wish
 		err := stream.Send(&proto.Message{
 			Text:            text,
 			Type:            int32(Publish),
 			ClientReference: client_reference,
+			Time:            int32(time),
 		})
 		if err != nil {
 			log.Fatalf("Error while sending message: %v", err)
 		}
-		increaseTime() // an event occurred
 	}
 
 	// wait for response to disconnect message
@@ -150,7 +156,7 @@ func connectAndPublish(client *Client) {
 
 func connectToServer() proto.ChittyChatServiceClient {
 	// Dial the server at the specified port.
-	conn, err := grpc.Dial("127.0.0.1:"+strconv.Itoa(*serverPort), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.Dial(*serverAddr+":"+strconv.Itoa(*serverPort), grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatalf("Could not connect to port %d", *serverPort)
 	} else {

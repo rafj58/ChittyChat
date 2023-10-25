@@ -24,6 +24,7 @@ const ( // connection status
 type Server struct {
 	proto.UnimplementedChittyChatServiceServer
 	name             string
+	address          string
 	port             int
 	clientReferences map[string]proto.ChittyChatService_SendMessageServer
 	mutex            sync.Mutex // avoid race condition
@@ -51,20 +52,21 @@ func main() {
 func startServer() {
 	// Create a server struct
 	server := &Server{
-		name: "server",
-		port: *port,
+		name:    "server",
+		port:    *port,
+		address: GetOutboundIP().String(),
 	}
 
 	// Create a new grpc server
 	grpcServer := grpc.NewServer()
 
 	// Make the server listen at the given port (convert int port to string)
-	listener, err := net.Listen("tcp", fmt.Sprintf("localhost:%s", strconv.Itoa(server.port)))
+	listener, err := net.Listen("tcp", fmt.Sprintf("%s:%s", server.address, strconv.Itoa(server.port)))
 
 	if err != nil {
 		log.Fatalf("Could not create the server %v", err)
 	}
-	log.Printf("Started server at port: %d\n", server.port)
+	log.Printf("Started server at address: %s and at port: %d\n", server.address, server.port)
 
 	// Register the grpc service
 	proto.RegisterChittyChatServiceServer(grpcServer, server)
@@ -183,4 +185,18 @@ func increaseTime() {
 func setTime(received int) {
 	max := math.Max(float64(received), float64(time))
 	time = int(max + 1)
+}
+
+// Get preferred outbound ip of this machine
+// Usefull if you have to know which ip you should dial, in a client running on an other computer
+func GetOutboundIP() net.IP {
+	conn, err := net.Dial("udp", "8.8.8.8:80")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer conn.Close()
+
+	localAddr := conn.LocalAddr().(*net.UDPAddr)
+
+	return localAddr.IP
 }
