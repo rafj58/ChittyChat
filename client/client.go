@@ -75,17 +75,18 @@ func connectAndPublish(client *Client) {
 		return
 	}
 
+	increaseTime() // an event occurred
 	// Connect message from client to server
 	connectMessage := &proto.Message{
 		Text:            "connect message",
 		Type:            int32(Connect),
 		ClientReference: client_reference,
+		Time:            int32(time),
 	}
 
 	if err := stream.Send(connectMessage); err != nil {
 		log.Fatalf("Error while sending connection message: %v", err)
 	}
-	increaseTime() // an event occurred
 
 	// wait for go routine
 	var wg sync.WaitGroup

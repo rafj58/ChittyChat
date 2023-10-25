@@ -93,7 +93,7 @@ func (s *Server) SendMessage(stream proto.ChittyChatService_SendMessageServer) e
 			setTime(int(msg.Time))
 		}
 		// client reference as a String
-		clientString := msg.ClientReference.ClientAddress + ":" + strconv.Itoa(int(msg.ClientReference.ClientPort))
+		clientString := msg.ClientReference.ClientName + " " + msg.ClientReference.ClientAddress + ":" + strconv.Itoa(int(msg.ClientReference.ClientPort))
 		log.Printf("Received message from %s", clientString)
 
 		if err != nil {
@@ -106,13 +106,14 @@ func (s *Server) SendMessage(stream proto.ChittyChatService_SendMessageServer) e
 			{
 				// add to map
 				s.clientReferences[clientString] = stream
-				log.Printf("Client %s connected", clientString)
+				log.Printf("Client %s has connected", clientString)
 				/* R6: A "Participant X  joined Chitty-Chat at Lamport time L" message is broadcast
 				to all Participants when client X joins, including the new Participant. */
 				for clientRef, clientStream := range s.clientReferences {
-					msg.Time = int32(time)
-					err = clientStream.Send(msg)
 					increaseTime() // an event occurred
+					msg.Time = int32(time)
+					msg.Text = clientString + " has joined the chat at Lamport time " + strconv.Itoa(time)
+					err = clientStream.Send(msg)
 					if err != nil {
 						log.Printf("Error during forwarding connection message to %s: %v", clientRef, err)
 						break
@@ -123,16 +124,18 @@ func (s *Server) SendMessage(stream proto.ChittyChatService_SendMessageServer) e
 		case Disconnect:
 			{
 				// reply with ack
-				stream.Send(&proto.Message{Type: Ack})
+				increaseTime()
+				stream.Send(&proto.Message{Type: Ack, Time: int32(time)})
 				// remove stream from map
 				delete(s.clientReferences, clientString)
 				log.Printf("Client %s disconnected", clientString)
 				/* R8: A "Participant X left Chitty-Chat at Lamport time L" message is broadcast
 				to all remaining Participants when Participant X leaves. */
 				for clientRef, clientStream := range s.clientReferences {
+					increaseTime()
 					msg.Time = int32(time)
+					msg.Text = clientString + " has left the chat at Lamport time " + strconv.Itoa(time)
 					err = clientStream.Send(msg)
-					increaseTime() // an event occurred
 					if err != nil {
 						log.Printf("Error during forwarding disconnection message to %s: %v", clientRef, err)
 						break
@@ -146,9 +149,9 @@ func (s *Server) SendMessage(stream proto.ChittyChatService_SendMessageServer) e
 				/* R3: Chitty-Chat service broadcast every published message, together with the current logical time */
 				for clientRef, clientStream := range s.clientReferences {
 					if clientRef != clientString { // Do not forward the message to the original sender
+						increaseTime()         // an event occurred
 						msg.Time = int32(time) // send current logial timestamp
 						err = clientStream.Send(msg)
-						increaseTime() // an event occurred
 						if err != nil {
 							log.Printf("Error during forwarding to %s: %v", clientRef, err)
 							break
