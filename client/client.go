@@ -121,6 +121,12 @@ func connectAndPublish(client *Client) {
 		var text string
 		log.Printf("Enter the content of the message ('exit' to quit): ")
 		fmt.Scanln(&text)
+
+		if len(text) > 128 {
+			log.Println("Message cannot be more than 128 characters")
+			continue
+		}
+
 		// R7: Chat clients can drop out at any time
 		if text == "exit" {
 			increaseTime() // an event occurred
