@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"log"
 	"math"
-	"os"
 	"strconv"
 	"sync"
 
@@ -41,10 +40,6 @@ func main() {
 	// Parse the flags to get the port for the client
 	flag.Parse()
 
-	// sets the logger to use a log.txt file instead of the console
-	//f := setLog()
-	//defer f.Close()
-
 	// Create a client
 	client := &Client{
 		name:       *clientName,
@@ -73,6 +68,8 @@ func connectAndPublish(client *Client) {
 	if err != nil {
 		log.Println(err)
 		return
+	} else {
+		log.Printf("[Lamport Time: %d] Connected to server", time)
 	}
 
 	increaseTime() // an event occurred
@@ -86,6 +83,8 @@ func connectAndPublish(client *Client) {
 
 	if err := stream.Send(connectMessage); err != nil {
 		log.Fatalf("Error while sending connection message: %v", err)
+	} else {
+		log.Printf("[Lamport Time: %d] Sent connect message to server", time)
 	}
 
 	// wait for go routine
@@ -110,7 +109,7 @@ func connectAndPublish(client *Client) {
 			} else {
 				// R4: When a client receives a broadcasted message, it has to write the message and the current logical timestamp
 				//senderReference := msg.ClientReference.ClientAddress + ":" + strconv.Itoa(int(msg.ClientReference.ClientPort))
-				log.Printf("[Lambert Time: %d, Name: %s] %s\n", msg.Time, msg.ClientReference.ClientName, msg.Text)
+				log.Printf("[Lamport Time: %d, Name: %s] %s\n", time, msg.ClientReference.ClientName, msg.Text)
 				//log.Printf("[%s] sent %s serverTime %d  localTime %d \n", senderReference, msg.Text, msg.Time, time)
 				log.Printf("Enter the content of the message ('exit' to quit): ") // just for better user experience
 			}
@@ -164,22 +163,6 @@ func connectToServer() proto.ChittyChatServiceClient {
 		log.Printf("Connected to the server at port %d\n", *serverPort)
 	}
 	return proto.NewChittyChatServiceClient(conn)
-}
-
-// sets the logger to use a log.txt file instead of the console
-func setLog() *os.File {
-	// Clears the log.txt file when a new server is started
-	if err := os.Truncate("log.txt", 0); err != nil {
-		log.Printf("Failed to truncate: %v", err)
-	}
-
-	// This connects to the log file/changes the output of the log informaiton to the log.txt file.
-	f, err := os.OpenFile("log.txt", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-	if err != nil {
-		log.Fatalf("error opening file: %v", err)
-	}
-	log.SetOutput(f)
-	return f
 }
 
 func increaseTime() {

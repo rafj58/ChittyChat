@@ -7,7 +7,6 @@ import (
 	"log"
 	"math"
 	"net"
-	"os"
 	"strconv"
 	"sync"
 
@@ -94,7 +93,6 @@ func (s *Server) SendMessage(stream proto.ChittyChatService_SendMessageServer) e
 		}
 		// client reference as a String
 		clientString := msg.ClientReference.ClientName + " " + msg.ClientReference.ClientAddress + ":" + strconv.Itoa(int(msg.ClientReference.ClientPort))
-		log.Printf("Received message from %s", clientString)
 
 		if err != nil {
 			log.Printf("Error while receiving message %v", err)
@@ -106,46 +104,52 @@ func (s *Server) SendMessage(stream proto.ChittyChatService_SendMessageServer) e
 			{
 				// add to map
 				s.clientReferences[clientString] = stream
-				log.Printf("Client %s has connected", clientString)
+				log.Printf("[Lamport time: %d] Client %s has connected", time, clientString)
 				/* R6: A "Participant X  joined Chitty-Chat at Lamport time L" message is broadcast
 				to all Participants when client X joins, including the new Participant. */
+				joinedtime := time
 				for clientRef, clientStream := range s.clientReferences {
 					increaseTime() // an event occurred
 					msg.Time = int32(time)
-					msg.Text = clientString + " has joined the chat at Lamport time " + strconv.Itoa(time)
+					msg.Text = clientString + " has joined the chat at Lamport time " + strconv.Itoa(joinedtime)
 					err = clientStream.Send(msg)
 					if err != nil {
 						log.Printf("Error during forwarding connection message to %s: %v", clientRef, err)
 						break
 					}
+					log.Printf("[Lamport time: %d] Sent message to client: %s", time, clientRef)
 				}
 				break
 			}
 		case Disconnect:
 			{
+				log.Printf("[Lamport Time: %d] Received disconnect message from client: %s", time, clientString)
 				// reply with ack
 				increaseTime()
 				stream.Send(&proto.Message{Type: Ack, Time: int32(time)})
 				// remove stream from map
 				delete(s.clientReferences, clientString)
-				log.Printf("Client %s disconnected", clientString)
+				log.Printf("[Lamport time: %d] Client %s disconnected", time, clientString)
 				/* R8: A "Participant X left Chitty-Chat at Lamport time L" message is broadcast
 				to all remaining Participants when Participant X leaves. */
+				disconnectedTime := time
 				for clientRef, clientStream := range s.clientReferences {
 					increaseTime()
 					msg.Time = int32(time)
-					msg.Text = clientString + " has left the chat at Lamport time " + strconv.Itoa(time)
+					msg.Text = clientString + " has left the chat at Lamport time " + strconv.Itoa(disconnectedTime)
 					err = clientStream.Send(msg)
 					if err != nil {
 						log.Printf("Error during forwarding disconnection message to %s: %v", clientRef, err)
 						break
 					}
+					log.Printf("[Lamport time: %d] Sent message to client: %s", time, clientRef)
 				}
 				run = false
 				break
 			}
 		case Publish:
 			{
+				log.Printf("[Lamport Time: %d] Received messgae from client: %s", time, clientString)
 				/* R3: Chitty-Chat service broadcast every published message, together with the current logical time */
 				for clientRef, clientStream := range s.clientReferences {
 					if clientRef != clientString { // Do not forward the message to the original sender
@@ -156,6 +160,7 @@ func (s *Server) SendMessage(stream proto.ChittyChatService_SendMessageServer) e
 							log.Printf("Error during forwarding to %s: %v", clientRef, err)
 							break
 						}
+						log.Printf("[Lamport time: %d] Sent message to client: %s", time, clientRef)
 					}
 				}
 				break
@@ -163,22 +168,6 @@ func (s *Server) SendMessage(stream proto.ChittyChatService_SendMessageServer) e
 		}
 	}
 	return nil
-}
-
-// sets the logger to use a log.txt file instead of the console
-func setLog() *os.File {
-	// Clears the log.txt file when a new server is started
-	if err := os.Truncate("log.txt", 0); err != nil {
-		log.Printf("Failed to truncate: %v", err)
-	}
-
-	// This connects to the log file/changes the output of the log informaiton to the log.txt file.
-	f, err := os.OpenFile("log.txt", os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-	if err != nil {
-		log.Fatalf("error opening file: %v", err)
-	}
-	log.SetOutput(f)
-	return f
 }
 
 func increaseTime() {
@@ -191,7 +180,7 @@ func setTime(received int) {
 }
 
 // Get preferred outbound ip of this machine
-// Usefull if you have to know which ip you should dial, in a client running on an other computer
+// Taken from provided tutorial: https://github.com/PatrickMatthiesen/DSYS-gRPC-template/blob/main/server/server.go
 func GetOutboundIP() net.IP {
 	conn, err := net.Dial("udp", "8.8.8.8:80")
 	if err != nil {
