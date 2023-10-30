@@ -8,3 +8,5 @@ To start the server simply run the command ```go run ./server/server.go``` and t
 To properly start the client instead we should specify the port on which to start it and the address of the server. The flags to use are -cPort and -sAddr: ```go run ./client/client.go -sAddr <serverAddress> -cPort <clientPort>``` 
 
 If the default server port is changed we will have to add the -sPort flag.
+
+A name can also be provided with the -cName flag to differentiate between clients.
